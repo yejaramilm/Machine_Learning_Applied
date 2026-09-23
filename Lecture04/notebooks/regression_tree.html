@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decision Tree · Regression · Variance</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09080d;
+  --s1: #0e0d14;
+  --s2: #13121c;
+  --s3: #1a1825;
+  --border: #242233;
+  --text: #e0ddf0;
+  --dim: #5c5a78;
+  --accent: #f59e0b;
+  --accent2: #a78bfa;
+  --accent3: #f87171;
+  --dot: #c4b5fd;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+header {
+  padding: 0.55rem 1.2rem;
+  display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;
+  background: var(--s1); border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+header h1 { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 800; letter-spacing: -0.02em; white-space: nowrap; }
+header h1 em { color: var(--accent); font-style: normal; }
+.tag { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; padding: 0.15rem 0.5rem; border-radius: 99px; border: 1px solid var(--accent); color: var(--accent); letter-spacing: 0.1em; }
+.spacer { flex: 1; }
+.sep-v { width: 1px; height: 18px; background: var(--border); }
+.axis-toggle { display: flex; background: var(--s2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.axis-toggle button {
+  padding: 0.28rem 0.8rem; font-family: 'JetBrains Mono', monospace; font-size: 0.7rem;
+  border: none; background: transparent; color: var(--dim); cursor: pointer; transition: all 0.12s;
+}
+.axis-toggle button.on { background: var(--s3); color: var(--text); }
+.hbtn { padding: 0.28rem 0.8rem; border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.74rem; font-weight: 500; border: 1px solid var(--border); background: var(--s3); color: var(--text); cursor: pointer; transition: all 0.12s; white-space: nowrap; }
+.hbtn:hover { border-color: var(--accent); color: var(--accent); }
+.hbtn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.hbtn.primary:hover { background: #d97706; }
+.hbtn.warn { border-color: var(--accent3); color: var(--accent3); }
+.hbtn.warn:hover { background: var(--accent3); color: #fff; }
+.hbtn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+.body-wrap { display: flex; flex: 1; overflow: hidden; }
+
+/* CANVAS COL */
+.canvas-col { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.breadcrumb { padding: 0.32rem 0.9rem; background: var(--s2); border-bottom: 1px solid var(--border); font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; display: flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; flex-shrink: 0; }
+.crumb { color: var(--accent); cursor: pointer; text-decoration: underline dotted; }
+.crumb:hover { color: #fff; }
+.bsep { color: var(--border); }
+.depth-chip { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--dim); background: var(--s3); border: 1px solid var(--border); padding: 0.1rem 0.4rem; border-radius: 99px; }
+.depth-chip span { color: var(--accent); }
+.canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+canvas { display: block; cursor: crosshair; }
+
+/* INFO COL */
+.info-col { width: 300px; flex-shrink: 0; background: var(--s1); border-left: 1px solid var(--border); overflow-y: auto; display: flex; flex-direction: column; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
+.sec { padding: 0.9rem 1rem; border-bottom: 1px solid var(--border); }
+.sec-title { font-family: 'Syne', sans-serif; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim); margin-bottom: 0.65rem; }
+
+.hint { background: var(--s3); border-left: 3px solid var(--accent); border-radius: 0 7px 7px 0; padding: 0.45rem 0.7rem; font-size: 0.7rem; color: var(--dim); line-height: 1.5; margin-bottom: 0.65rem; }
+
+.stat-row { display: flex; gap: 0.4rem; margin-bottom: 0.65rem; }
+.stat-pill { flex: 1; background: var(--s2); border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.6rem; text-align: center; }
+.stat-pill .sp-label { font-size: 0.62rem; color: var(--dim); margin-bottom: 0.18rem; }
+.stat-pill .sp-val { font-family: 'JetBrains Mono', monospace; font-size: 0.92rem; font-weight: 500; color: var(--accent); }
+
+.var-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.32rem; }
+.var-label { font-size: 0.7rem; color: var(--dim); }
+.var-num { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 500; color: var(--accent); }
+.var-track { height: 5px; background: var(--s3); border-radius: 99px; overflow: hidden; }
+.var-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.22s ease; }
+.var-range { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--border); font-family: 'JetBrains Mono', monospace; margin-top: 0.2rem; }
+
+.split-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.6rem; }
+.split-side { background: var(--s2); border: 1px solid var(--border); border-radius: 8px; padding: 0.65rem; }
+.split-side-title { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: var(--dim); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.35rem; }
+.side-var { font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--accent); margin-bottom: 0.1rem; }
+.side-mean { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--accent2); margin-bottom: 0.08rem; }
+.side-n { font-size: 0.64rem; color: var(--dim); }
+.side-bar { height: 3px; border-radius: 99px; margin-top: 0.4rem; background: var(--s3); overflow: hidden; }
+.side-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent3)); transition: width 0.22s; }
+
+.gain-card { background: linear-gradient(135deg, rgba(245,158,11,0.09), rgba(245,158,11,0.02)); border: 1px solid rgba(245,158,11,0.22); border-radius: 10px; padding: 0.8rem; display: flex; align-items: center; justify-content: space-between; }
+.gain-label { font-size: 0.7rem; color: var(--dim); }
+.gain-sub { font-size: 0.62rem; color: var(--dim); margin-top: 0.08rem; font-family: 'JetBrains Mono', monospace; }
+.gain-val { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 500; color: var(--accent); }
+.gain-val.neg { color: var(--accent3) !important; }
+
+.tree-node-row { display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.4rem; border-radius: 5px; cursor: pointer; font-family: 'JetBrains Mono', monospace; font-size: 0.63rem; color: var(--dim); transition: background 0.1s; }
+.tree-node-row:hover { background: var(--s3); color: var(--text); }
+.tree-node-row.active { background: rgba(245,158,11,0.08); color: var(--accent); }
+.tree-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Decision Tree · <em>Regression</em></h1>
+  <span class="tag">VARIANCE</span>
+  <div class="spacer"></div>
+  <div class="axis-toggle">
+    <button class="on" id="btnX" onclick="setAxis('x')">X split</button>
+    <button id="btnY" onclick="setAxis('y')">Y split</button>
+  </div>
+  <button class="hbtn primary" id="fixBtn" onclick="fixSplit()" disabled>Fix Split</button>
+  <button class="hbtn warn" id="upBtn" onclick="goUp()" disabled>↑ Up</button>
+  <button class="hbtn" onclick="resample()">Resample</button>
+  <button class="hbtn" onclick="resetAll()">Reset</button>
+</header>
+
+<div class="body-wrap">
+  <div class="canvas-col">
+    <div class="breadcrumb" id="breadcrumb">
+      <span class="crumb" onclick="navTo('root')">Root</span>
+      <div class="depth-chip">Depth <span id="depthTxt">0</span>/2</div>
+    </div>
+    <div class="canvas-wrap" id="canvasWrap">
+      <canvas id="canvas"></canvas>
+    </div>
+  </div>
+
+  <div class="info-col">
+    <div class="sec">
+      <div class="sec-title">Current Node</div>
+      <div class="hint" id="hintMsg">Move cursor over the plot to preview a split.</div>
+      <div class="stat-row">
+        <div class="stat-pill"><div class="sp-label">n</div><div class="sp-val" id="statN">—</div></div>
+        <div class="stat-pill"><div class="sp-label">mean ȳ</div><div class="sp-val" id="statMean">—</div></div>
+        <div class="stat-pill"><div class="sp-label">std σ</div><div class="sp-val" id="statStd">—</div></div>
+      </div>
+      <div>
+        <div class="var-head">
+          <span class="var-label">Node Variance σ²</span>
+          <span class="var-num" id="nodeVarVal">—</span>
+        </div>
+        <div class="var-track"><div class="var-fill" id="nodeVarBar" style="width:0%"></div></div>
+        <div class="var-range"><span>0 (homogeneous)</span><span>max</span></div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">Split Preview</div>
+      <div class="split-cols">
+        <div class="split-side">
+          <div class="split-side-title" id="leftTitle">◀ Left  (X ≤ threshold)</div>
+          <div class="side-var" id="lvar">—</div>
+          <div class="side-mean" id="lmean">ȳ = —</div>
+          <div class="side-n" id="ln">n = —</div>
+          <div class="side-bar"><div class="side-bar-fill" id="lbar" style="width:0%"></div></div>
+        </div>
+        <div class="split-side">
+          <div class="split-side-title" id="rightTitle">▶ Right  (X > threshold)</div>
+          <div class="side-var" id="rvar">—</div>
+          <div class="side-mean" id="rmean">ȳ = —</div>
+          <div class="side-n" id="rn">n = —</div>
+          <div class="side-bar"><div class="side-bar-fill" id="rbar" style="width:0%"></div></div>
+        </div>
+      </div>
+      <div class="gain-card">
+        <div>
+          <div class="gain-label">Variance Reduction</div>
+          <div class="gain-sub" id="gainFormula">hover to compute</div>
+        </div>
+        <div class="gain-val" id="gainVal">—</div>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-title">Tree Structure</div>
+      <div id="treeViz" style="font-size:0.72rem;color:var(--dim)">No splits fixed yet.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════
+let axis = 'x';
+let mouseVal = null;   // data-space value under cursor (x or t depending on axis)
+let nodes = {};
+let currentId = 'root';
+let allData = [];
+let globalMaxVar = 1;
+const PADL = 52, PADR = 20, PADT = 20, PADB = 40;
+
+// ══════════════════════════════════════════
+// DATA  — 1D: x is feature, t is target
+// ══════════════════════════════════════════
+function genData() {
+  const N = 80;
+  allData = [];
+  // Three segments with distinct means + noise
+  for (let i = 0; i < N; i++) {
+    const x = Math.random();
+    let t;
+    if (x < 0.35)      t = 0.75 + (Math.random() - 0.5) * 0.25;
+    else if (x < 0.65) t = 0.25 + (Math.random() - 0.5) * 0.20;
+    else               t = 0.60 + (Math.random() - 0.5) * 0.22;
+    allData.push({ x, t: Math.max(0.02, Math.min(0.98, t)) });
+  }
+  allData.sort((a, b) => a.x - b.x);
+  globalMaxVar = variance(allData) * 1.4 || 1;
+}
+
+function resample() {
+  genData();
+  nodes = { root: { id:'root', parentId:null, side:null, depth:0, data:[...allData], split:null, children:null } };
+  currentId = 'root'; mouseVal = null;
+  updateAll();
+  resize();
+}
+function resetAll() {
+  nodes = { root: { id:'root', parentId:null, side:null, depth:0, data:[...allData], split:null, children:null } };
+  currentId = 'root'; mouseVal = null;
+  updateAll();
+}
+
+// ══════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════
+function mean(pts)     { if (!pts.length) return 0; return pts.reduce((s,p)=>s+p.t,0)/pts.length; }
+function variance(pts) { const n=pts.length; if (!n) return 0; const m=mean(pts); return pts.reduce((s,p)=>s+(p.t-m)**2,0)/n; }
+function std(pts)      { return Math.sqrt(variance(pts)); }
+// Split on x or t depending on axis
+function splitPts(pts, ax, val) {
+  if (ax === 'x') return [pts.filter(p=>p.x<=val), pts.filter(p=>p.x>val)];
+  else            return [pts.filter(p=>p.t<=val), pts.filter(p=>p.t>val)];
+}
+
+// ══════════════════════════════════════════
+// NODE BOUNDS  (tracks both x and t ranges)
+// ══════════════════════════════════════════
+function getNodeBounds(id) {
+  const b = { x0: 0, x1: 1, t0: 0, t1: 1 };
+  const path = [];
+  let n = nodes[id];
+  while (n && n.parentId) { path.unshift(n); n = nodes[n.parentId]; }
+  let cur = nodes['root'];
+  for (const step of path) {
+    if (!cur || !cur.split) break;
+    const { ax, val } = cur.split;
+    if (step.side === 'L') {
+      if (ax === 'x') b.x1 = Math.min(b.x1, val);
+      else            b.t1 = Math.min(b.t1, val);
+    } else {
+      if (ax === 'x') b.x0 = Math.max(b.x0, val);
+      else            b.t0 = Math.max(b.t0, val);
+    }
+    cur = nodes[step.id];
+  }
+  return b;
+}
+
+function isAncestorNode(ancestorId, nodeId) {
+  let n = nodes[nodeId];
+  while (n && n.parentId) { if (n.parentId === ancestorId) return true; n = nodes[n.parentId]; }
+  return false;
+}
+
+// ══════════════════════════════════════════
+// CANVAS
+// ══════════════════════════════════════════
+const canvas = document.getElementById('canvas');
+const ctx    = canvas.getContext('2d');
+const wrap   = document.getElementById('canvasWrap');
+
+function resize() { canvas.width = wrap.clientWidth; canvas.height = wrap.clientHeight; draw(); }
+window.addEventListener('resize', resize);
+
+// Data → canvas
+function toCx(x) { return PADL + x * (canvas.width  - PADL - PADR); }
+function toCy(t) { return canvas.height - PADB - t * (canvas.height - PADT - PADB); }
+// Canvas → data
+function toDataX(cx) { return (cx - PADL) / (canvas.width - PADL - PADR); }
+function toDataY(cy) { return (canvas.height - PADB - cy) / (canvas.height - PADT - PADB); }
+
+// Draw a split line clipped to the node's bounding box
+function drawClippedLine(ax, val, bounds, color, alpha, dashed) {
+  ctx.save();
+  ctx.globalAlpha = alpha ?? 1;
+  ctx.strokeStyle = color; ctx.lineWidth = dashed ? 1.2 : 2;
+  if (dashed) ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  if (ax === 'x') {
+    const cx = toCx(val);
+    ctx.moveTo(cx, toCy(bounds.t1)); ctx.lineTo(cx, toCy(bounds.t0));
+  } else {
+    const cy = toCy(val);
+    ctx.moveTo(toCx(bounds.x0), cy); ctx.lineTo(toCx(bounds.x1), cy);
+  }
+  ctx.stroke(); ctx.restore();
+}
+
+function draw() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#09080d'; ctx.fillRect(0, 0, W, H);
+
+  // ── axes ──
+  ctx.strokeStyle = '#242233'; ctx.lineWidth = 1;
+  // horizontal grid lines
+  for (let t = 0; t <= 1; t += 0.2) {
+    const cy = toCy(t);
+    ctx.beginPath(); ctx.moveTo(PADL, cy); ctx.lineTo(W - PADR, cy); ctx.stroke();
+  }
+  // Y axis labels
+  ctx.fillStyle = '#3a3858'; ctx.font = '10px JetBrains Mono,monospace'; ctx.textAlign = 'right';
+  for (let t = 0; t <= 1; t += 0.2) ctx.fillText(t.toFixed(1), PADL - 6, toCy(t) + 4);
+  // X axis labels
+  ctx.textAlign = 'center';
+  for (let x = 0; x <= 1; x += 0.2) ctx.fillText(x.toFixed(1), toCx(x), H - PADB + 14);
+  // Axis lines
+  ctx.strokeStyle = '#2e2c44'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(PADL, PADT); ctx.lineTo(PADL, H - PADB); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(PADL, H - PADB); ctx.lineTo(W - PADR, H - PADB); ctx.stroke();
+  // Axis labels
+  ctx.fillStyle = '#5c5a78'; ctx.font = '11px Outfit,sans-serif';
+  ctx.textAlign = 'center'; ctx.fillText('Feature X', PADL + (W - PADL - PADR) / 2, H - 4);
+  ctx.save(); ctx.translate(14, PADT + (H - PADT - PADB) / 2);
+  ctx.rotate(-Math.PI / 2); ctx.fillText('Target y', 0, 0); ctx.restore();
+
+  const node = nodes[currentId]; if (!node) return;
+
+  // ── dim all points ──
+  for (const p of allData) {
+    ctx.beginPath(); ctx.arc(toCx(p.x), toCy(p.t), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(196,181,253,0.12)'; ctx.fill();
+  }
+
+  // ── draw all fixed splits clipped to their node's bounds ──
+  for (const id in nodes) {
+    const n = nodes[id];
+    if (!n.split) continue;
+    if (id === currentId) continue;
+    const b = getNodeBounds(id);
+    const isAnc = isAncestorNode(id, currentId);
+    drawClippedLine(n.split.ax, n.split.val, b, '#f59e0b', isAnc ? 0.38 : 0.18, true);
+    if (n.children) {
+      for (const cid of n.children) {
+        const cn = nodes[cid];
+        if (cn && !cn.split) drawMeanBar(cn, getNodeBounds(cid), 0.18);
+      }
+    }
+  }
+
+  // ── shading: current node's bounds highlighted ──
+  const nb = getNodeBounds(currentId);
+  ctx.save();
+  ctx.globalAlpha = 0.04; ctx.fillStyle = '#a78bfa';
+  ctx.fillRect(toCx(nb.x0), toCy(nb.t1), toCx(nb.x1) - toCx(nb.x0), toCy(nb.t0) - toCy(nb.t1));
+  ctx.restore();
+
+  // ── active node points (bright) ──
+  for (const p of node.data) {
+    ctx.beginPath(); ctx.arc(toCx(p.x), toCy(p.t), 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#c4b5fd'; ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.lineWidth = 0.8; ctx.stroke();
+  }
+
+  // ── current node mean line ──
+  drawMeanBar(node, nb, 0.55);
+
+  // ── live preview split ──
+  if (mouseVal !== null && !node.split) {
+    const b = getNodeBounds(currentId);
+    // region tint
+    ctx.save(); ctx.globalAlpha = 0.06; ctx.fillStyle = '#f59e0b';
+    if (axis === 'x') {
+      ctx.fillRect(toCx(b.x0), toCy(b.t1), toCx(mouseVal) - toCx(b.x0), toCy(b.t0) - toCy(b.t1));
+    } else {
+      // shade region below the horizontal line (t ≤ mouseVal)
+      ctx.fillRect(toCx(b.x0), toCy(mouseVal), toCx(b.x1) - toCx(b.x0), toCy(b.t0) - toCy(mouseVal));
+    }
+    ctx.restore();
+    drawClippedLine(axis, mouseVal, b, '#fde68a', 0.9, false);
+    // preview means for each side
+    const [L, R] = splitPts(node.data, axis, mouseVal);
+    if (axis === 'x') {
+      if (L.length) drawPreviewMean(L, b.x0, mouseVal, 'rgba(167,139,250,0.45)');
+      if (R.length) drawPreviewMean(R, mouseVal, b.x1, 'rgba(251,146,60,0.45)');
+    } else {
+      if (L.length) drawPreviewMean(L, b.x0, b.x1, 'rgba(167,139,250,0.45)');
+      if (R.length) drawPreviewMean(R, b.x0, b.x1, 'rgba(251,146,60,0.45)');
+    }
+    // threshold label
+    ctx.save(); ctx.fillStyle = '#fde68a'; ctx.globalAlpha = 0.9;
+    ctx.font = '500 10px JetBrains Mono,monospace';
+    if (axis === 'x') {
+      ctx.textAlign = 'center';
+      ctx.fillText('x = ' + mouseVal.toFixed(3), toCx(mouseVal), PADT - 6);
+    } else {
+      ctx.textAlign = 'left';
+      ctx.fillText('y = ' + mouseVal.toFixed(3), W - PADR + 4, toCy(mouseVal) + 4);
+    }
+    ctx.restore();
+  }
+
+  // ── current node fixed split ──
+  if (node.split) {
+    const b = getNodeBounds(currentId);
+    drawClippedLine(node.split.ax, node.split.val, b, '#f59e0b', 0.95, false);
+    if (node.children) {
+      for (const cid of node.children) {
+        const cn = nodes[cid];
+        if (cn) drawMeanBar(cn, getNodeBounds(cid), 0.7);
+      }
+    }
+    // click-to-enter hints
+    const ax = node.split.ax, val = node.split.val;
+    ctx.save(); ctx.globalAlpha = 0.45; ctx.font = '600 11px Syne,sans-serif';
+    ctx.fillStyle = '#a78bfa'; ctx.textAlign = 'center';
+    if (ax === 'x') {
+      const cx = toCx(val);
+      ctx.fillText('← Left', PADL + (cx - PADL) / 2, PADT + 16);
+      ctx.font = '9px JetBrains Mono,monospace';
+      ctx.fillText('click to enter', PADL + (cx - PADL) / 2, PADT + 28);
+      ctx.fillStyle = '#fb923c'; ctx.font = '600 11px Syne,sans-serif';
+      ctx.fillText('Right →', cx + (W - PADR - cx) / 2, PADT + 16);
+      ctx.font = '9px JetBrains Mono,monospace';
+      ctx.fillText('click to enter', cx + (W - PADR - cx) / 2, PADT + 28);
+    } else {
+      const cy = toCy(val);
+      const midX = PADL + (W - PADR - PADL) / 2;
+      ctx.fillText('▼ Left', midX, cy + (H - PADB - cy) / 2);
+      ctx.font = '9px JetBrains Mono,monospace';
+      ctx.fillText('click to enter', midX, cy + (H - PADB - cy) / 2 + 14);
+      ctx.fillStyle = '#fb923c'; ctx.font = '600 11px Syne,sans-serif';
+      ctx.fillText('▲ Right', midX, PADT + (cy - PADT) / 2);
+      ctx.font = '9px JetBrains Mono,monospace';
+      ctx.fillText('click to enter', midX, PADT + (cy - PADT) / 2 + 14);
+    }
+    ctx.restore();
+  }
+}
+
+// Draw a horizontal mean line within [x0, x1] with a label
+function drawMeanBar(node, bounds, alpha) {
+  if (!node.data.length) return;
+  const m = mean(node.data);
+  const cy = toCy(m);
+  const cx0 = toCx(bounds.x0), cx1 = toCx(bounds.x1);
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = '#f59e0b'; ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(cx0, cy); ctx.lineTo(cx1, cy); ctx.stroke();
+  ctx.fillStyle = '#f59e0b'; ctx.font = '600 10px JetBrains Mono,monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('ȳ=' + m.toFixed(2), cx1 + 4, cy + 4);
+  ctx.restore();
+}
+
+// Draw a semi-transparent mean line for a preview split side
+function drawPreviewMean(pts, x0, x1, color) {
+  const m = mean(pts);
+  const cy = toCy(m);
+  ctx.save();
+  ctx.globalAlpha = 0.7; ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([4, 3]);
+  ctx.beginPath(); ctx.moveTo(toCx(x0), cy); ctx.lineTo(toCx(x1), cy); ctx.stroke();
+  ctx.fillStyle = color; ctx.font = '9px JetBrains Mono,monospace'; ctx.textAlign = 'center';
+  ctx.fillText(m.toFixed(2), toCx((x0 + x1) / 2), cy - 5);
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════
+// MOUSE / EVENTS
+// ══════════════════════════════════════════
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+  mouseVal = Math.max(0.01, Math.min(0.99, axis === 'x' ? toDataX(cx) : toDataY(cy)));
+  const node = nodes[currentId];
+  canvas.style.cursor = (node && node.split) ? 'pointer' : 'crosshair';
+  draw(); updateSplitPanel();
+});
+canvas.addEventListener('mouseleave', () => { mouseVal = null; draw(); updateSplitPanel(); });
+canvas.addEventListener('click', e => {
+  const node = nodes[currentId]; if (!node) return;
+  if (node.split && node.children) {
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left, cy = e.clientY - rect.top;
+    const v = node.split.ax === 'x' ? toDataX(cx) : toDataY(cy);
+    currentId = v <= node.split.val ? node.children[0] : node.children[1];
+    mouseVal = null; updateAll(); return;
+  }
+  if (mouseVal !== null) fixSplit();
+});
+
+// ══════════════════════════════════════════
+// ACTIONS
+// ══════════════════════════════════════════
+function fixSplit() {
+  if (mouseVal === null) return;
+  const node = nodes[currentId];
+  if (!node || node.split || node.depth >= 2) return;
+  node.split = { ax: axis, val: mouseVal };
+  const [L, R] = splitPts(node.data, axis, mouseVal);
+  const lid = currentId + '_L', rid = currentId + '_R';
+  nodes[lid] = { id:lid, parentId:currentId, side:'L', depth:node.depth+1, data:L, split:null, children:null };
+  nodes[rid] = { id:rid, parentId:currentId, side:'R', depth:node.depth+1, data:R, split:null, children:null };
+  node.children = [lid, rid];
+  currentId = L.length >= R.length ? lid : rid; mouseVal = null;
+  updateAll();
+}
+
+function goUp() {
+  const n = nodes[currentId];
+  if (n && n.parentId) { currentId = n.parentId; mouseVal = null; updateAll(); }
+}
+
+function navTo(id) { if (nodes[id]) { currentId = id; mouseVal = null; updateAll(); } }
+
+function setAxis(a) {
+  axis = a;
+  document.getElementById('btnX').classList.toggle('on', a === 'x');
+  document.getElementById('btnY').classList.toggle('on', a === 'y');
+  draw(); updateSplitPanel();
+}
+
+// ══════════════════════════════════════════
+// UI
+// ══════════════════════════════════════════
+function fmt(v, d=4) { return typeof v === 'number' ? v.toFixed(d) : '—'; }
+
+function updateAll() {
+  const node = nodes[currentId]; if (!node) return;
+  const v = variance(node.data), m = mean(node.data), s = std(node.data);
+
+  document.getElementById('statN').textContent    = node.data.length;
+  document.getElementById('statMean').textContent = fmt(m, 3);
+  document.getElementById('statStd').textContent  = fmt(s, 3);
+  document.getElementById('nodeVarVal').textContent = fmt(v);
+  document.getElementById('nodeVarBar').style.width = Math.min(100, (v / globalMaxVar) * 100) + '%';
+
+  const hasFixed = !!node.split, atMax = node.depth >= 2;
+  if (hasFixed && node.children) {
+    const [lid, rid] = node.children;
+    const lN = nodes[lid], rN = nodes[rid];
+    document.getElementById('hintMsg').innerHTML =
+      `Split fixed: <b style="color:var(--accent)">${node.split.ax.toUpperCase()} ≤ ${node.split.val.toFixed(3)}</b><br>
+       <span style="font-size:0.7rem">Click a region or navigate:</span>
+       <div style="display:flex;gap:0.4rem;margin-top:0.4rem">
+         <button onclick="navTo('${lid}')" style="flex:1;padding:0.28rem;border-radius:6px;border:1px solid var(--accent2);background:rgba(167,139,250,0.1);color:var(--accent2);font-family:JetBrains Mono,monospace;font-size:0.66rem;cursor:pointer">
+           ◀ Left  n=${lN.data.length}  ȳ=${fmt(mean(lN.data),3)}
+         </button>
+         <button onclick="navTo('${rid}')" style="flex:1;padding:0.28rem;border-radius:6px;border:1px solid #fb923c;background:rgba(251,146,60,0.1);color:#fb923c;font-family:JetBrains Mono,monospace;font-size:0.66rem;cursor:pointer">
+           Right ▶  n=${rN.data.length}  ȳ=${fmt(mean(rN.data),3)}
+         </button>
+       </div>`;
+  } else {
+    document.getElementById('hintMsg').textContent =
+      atMax ? 'Leaf node — predicted value is the mean ȳ shown on the plot.'
+            : 'Hover to preview a split. Click the canvas or "Fix Split" to lock it in.';
+  }
+
+  document.getElementById('fixBtn').disabled = hasFixed || atMax || mouseVal === null;
+  document.getElementById('upBtn').disabled  = !node.parentId;
+  buildBreadcrumb(node);
+  buildTreeViz();
+  updateSplitPanel();
+  draw();
+}
+
+function updateSplitPanel() {
+  const node = nodes[currentId]; if (!node) return;
+  const v = variance(node.data), n = node.data.length;
+
+  // Update side titles based on active axis
+  const curAx = (node.split ? node.split.ax : axis);
+  if (curAx === 'x') {
+    document.getElementById('leftTitle').textContent  = '◀ Left  (X ≤ threshold)';
+    document.getElementById('rightTitle').textContent = '▶ Right  (X > threshold)';
+  } else {
+    document.getElementById('leftTitle').textContent  = '▼ Left  (Y ≤ threshold)';
+    document.getElementById('rightTitle').textContent = '▲ Right  (Y > threshold)';
+  }
+
+  const src = mouseVal !== null && !node.split ? { ax: axis, val: mouseVal }
+            : node.split ? node.split : null;
+
+  if (src !== null && n > 0) {
+    const [L, R] = splitPts(node.data, src.ax, src.val);
+    const vl = variance(L), vr = variance(R);
+    const ml = mean(L), mr = mean(R);
+    const wv = (L.length / n) * vl + (R.length / n) * vr;
+    const gain = v - wv;
+    const wL = (L.length / n).toFixed(2), wR = (R.length / n).toFixed(2);
+
+    document.getElementById('lvar').textContent  = fmt(vl);
+    document.getElementById('lmean').textContent = `ȳ = ${fmt(ml, 3)}`;
+    document.getElementById('ln').textContent    = `n = ${L.length}`;
+    document.getElementById('lbar').style.width  = Math.min(100, (vl / globalMaxVar) * 100) + '%';
+    document.getElementById('rvar').textContent  = fmt(vr);
+    document.getElementById('rmean').textContent = `ȳ = ${fmt(mr, 3)}`;
+    document.getElementById('rn').textContent    = `n = ${R.length}`;
+    document.getElementById('rbar').style.width  = Math.min(100, (vr / globalMaxVar) * 100) + '%';
+    document.getElementById('gainFormula').textContent = `${fmt(v)} − [${wL}·${fmt(vl)} + ${wR}·${fmt(vr)}]`;
+    const gv = document.getElementById('gainVal');
+    gv.textContent = fmt(gain); gv.className = 'gain-val' + (gain < 0 ? ' neg' : '');
+    if (!node.split) document.getElementById('fixBtn').disabled = false;
+  } else {
+    ['lvar','rvar'].forEach(id => document.getElementById(id).textContent = '—');
+    ['lmean','rmean'].forEach(id => document.getElementById(id).textContent = 'ȳ = —');
+    ['ln','rn'].forEach(id => document.getElementById(id).textContent = 'n = —');
+    ['lbar','rbar'].forEach(id => document.getElementById(id).style.width = '0%');
+    document.getElementById('gainFormula').textContent = 'hover to compute';
+    document.getElementById('gainVal').textContent = '—';
+    document.getElementById('gainVal').className = 'gain-val';
+    if (!node.split && node.depth < 2) document.getElementById('fixBtn').disabled = true;
+  }
+}
+
+function buildBreadcrumb(node) {
+  const chain = []; let n = node;
+  while (n) { chain.unshift(n); n = n.parentId ? nodes[n.parentId] : null; }
+  let html = '';
+  for (let i = 0; i < chain.length; i++) {
+    const nn = chain[i];
+    const label = nn.id === 'root' ? 'Root' : `${nn.side} (d${nn.depth})`;
+    if (i < chain.length - 1) html += `<span class="crumb" onclick="navTo('${nn.id}')">${label}</span><span class="bsep">›</span>`;
+    else html += `<span style="color:var(--text)">${label}</span>`;
+  }
+  html += `<div class="depth-chip">Depth <span>${node.depth}</span>/2</div>`;
+  document.getElementById('breadcrumb').innerHTML = html;
+}
+
+function buildTreeViz() {
+  const el = document.getElementById('treeViz');
+  if (!nodes['root']?.split) { el.innerHTML = '<span>No splits fixed yet.</span>'; return; }
+  el.innerHTML = renderNode('root', 0);
+}
+
+function renderNode(id, indent) {
+  const n = nodes[id]; if (!n) return '';
+  const isActive = id === currentId;
+  const isLeaf = !n.split && n.depth > 0;
+  const dotColor = n.split ? '#fde68a' : isLeaf ? '#a78bfa' : '#242233';
+  const v = variance(n.data), m = mean(n.data);
+  const label = id === 'root'
+    ? `Root · n=${n.data.length} · σ²=${v.toFixed(3)}`
+    : `${n.side} · n=${n.data.length} · ȳ=${m.toFixed(3)} · σ²=${v.toFixed(3)}`;
+  const spl = n.split ? ` [${n.split.ax.toUpperCase()}≤${n.split.val.toFixed(3)}]` : '';
+  let html = `<div class="tree-node-row ${isActive ? 'active' : ''}" onclick="navTo('${id}')" style="padding-left:${0.4 + indent * 1.1}rem">
+    <div class="tree-dot" style="background:${dotColor}"></div>
+    <span>${label}${spl}</span></div>`;
+  if (n.children) for (const cid of n.children) html += renderNode(cid, indent + 1);
+  return html;
+}
+
+// ══════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════
+genData();
+resetAll();
+resize();
+</script>
+</body>
+</html>
